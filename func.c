@@ -3,6 +3,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <time.h>
+#include <stdlib.h>
 
 struct block_header
 {
@@ -43,7 +45,7 @@ struct block_header *request_extra(struct block_header *last, size_t size)
     return new_block;
 }
 
-void *malloc(size_t size)
+void *my_malloc(size_t size)
 {
     if (size <= 0)
     {
@@ -75,7 +77,7 @@ void *malloc(size_t size)
     return (block + 1);
 }
 
-void free(void *pointer)
+void my_free(void *pointer)
 {
     if (!pointer)
     {
@@ -102,7 +104,7 @@ void free(void *pointer)
     }
 }
 
-void *realloc(void *pointer, size_t size)
+void *my_realloc(void *pointer, size_t size)
 {
     if (!pointer)
     {
@@ -114,24 +116,24 @@ void *realloc(void *pointer, size_t size)
         return pointer;
     }
     void *new_pointer;
-    new_pointer = malloc(size);
+    new_pointer = my_malloc(size);
     if (!new_pointer)
     {
         return NULL;
     }
     memcpy(new_pointer, pointer, block_data->size);
-    free(pointer);
+    my_free(pointer);
     return new_pointer;
 }
 
-void *calloc(size_t n, size_t esize)
+void *my_calloc(size_t n, size_t esize)
 {
     if (esize && n > SIZE_MAX / esize)
     {
         return NULL;
     }
     size_t size = n * esize;
-    void *new_pointer = malloc(size);
+    void *new_pointer = my_malloc(size);
     if (!new_pointer)
     {
         return NULL;
@@ -139,35 +141,27 @@ void *calloc(size_t n, size_t esize)
     memset(new_pointer, 0, size);
     return new_pointer;
 }
-
 int main()
 {
-    int *a = malloc(sizeof(int));
-    *a = 1;
-    assert(*a == 1);
+    clock_t start, end;
 
-    free(a);
-    int *b = malloc(sizeof(int));
-    assert(b == a);
-
-    int *c = malloc(sizeof(int) * 4);
-    int *d = realloc(c, sizeof(int) * 5); // change to 3 as well
-    assert(d != NULL);
-
-    int *e = calloc(4, sizeof(int));
-    for (int i = 0; i < 4; i++)
+    start = clock();
+    for (int i = 0; i < 100000; i++)
     {
-        assert(e[i] == 0);
+        void *p = my_malloc(64);
+        my_free(p);
     }
+    end = clock();
+    printf("my allocator: %f seconds\n", (double)(end - start) / CLOCKS_PER_SEC);
 
-    int *x = malloc(16);
-    int *y = malloc(32);
-    free(x);
-    free(y);
-    int *z = malloc(48);
-    assert(z == x);
+    start = clock();
+    for (int i = 0; i < 100000; i++)
+    {
+        void *p = malloc(64);
+        free(p);
+    }
+    end = clock();
+    printf("glibc: %f seconds\n", (double)(end - start) / CLOCKS_PER_SEC);
 
-    // Checks all functionality
-    printf("All tests cleared\n");
     return 0;
 }

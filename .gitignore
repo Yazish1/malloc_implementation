@@ -1,2 +1,5 @@
 func
+bench_glibc
+libmalloc.so
+
 *.o
