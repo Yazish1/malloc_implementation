@@ -1,11 +1,11 @@
+#define _GNU_SOURCE
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
+#include <sys/mman.h>
 #include <stdint.h>
 #include <time.h>
 #include <stdlib.h>
-
 struct block_header
 {
     struct block_header *next;
@@ -15,6 +15,16 @@ struct block_header
 
 void *global_head = NULL;
 
+void split_block(struct block_header *block, size_t size)
+{
+    struct block_header *leftover = (struct block_header *)((char *)block + sizeof(struct block_header) + size);
+    leftover->size = block->size - size - sizeof(struct block_header);
+    leftover->next = block->next;
+    block->next = leftover;
+    leftover->isFree = 1;
+    block->size = size;
+    block->isFree = 0;
+}
 struct block_header *find_next_free(struct block_header **last, size_t size)
 {
     struct block_header *current = global_head;
@@ -28,10 +38,8 @@ struct block_header *find_next_free(struct block_header **last, size_t size)
 
 struct block_header *request_extra(struct block_header *last, size_t size)
 {
-    struct block_header *new_block;
-    new_block = sbrk(0);
-    void *request = sbrk(size + sizeof(struct block_header));
-    if (request == (void *)-1)
+    struct block_header *new_block = mmap(NULL, size + sizeof(struct block_header), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (new_block == MAP_FAILED)
     {
         return NULL;
     }
@@ -71,7 +79,14 @@ void *my_malloc(size_t size)
         }
         else
         {
-            block->isFree = 0;
+            if (block->size - size >= sizeof(struct block_header) + 1)
+            {
+                split_block(block, size);
+            }
+            else
+            {
+                block->isFree = 0;
+            }
         }
     }
     return (block + 1);
