@@ -1,5 +1,5 @@
 func
 bench_glibc
 libmalloc.so
-
+myalloc.so
 *.o
